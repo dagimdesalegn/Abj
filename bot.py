@@ -600,7 +600,6 @@ Details:
 • Payment Method: {context.user_data.get('payment_method', 'N/A')}
 
 Time: {message.date.strftime('%Y-%m-%d %H:%M:%S')}
-Admin Status: {'Online' if admin_online else 'Offline'}
     """.strip()
     
     # Send to admins with approval buttons (approvals are required)
@@ -686,11 +685,12 @@ Time: {query.message.date.strftime('%Y-%m-%d %H:%M:%S')}
 Welcome to ABJ Tutorial!
                 """.strip()
                 
-                await context.bot.send_photo(
-                    chat_id=LOG_CHANNEL_ID,
-                    photo=user_data.get('screenshot_file_id'),
-                    caption=log_message
-                )
+                if LOG_CHANNEL_ID:
+                    await context.bot.send_photo(
+                        chat_id=LOG_CHANNEL_ID,
+                        photo=user_data.get('screenshot_file_id'),
+                        caption=log_message
+                    )
             except Exception as e:
                 logger.error(f"Failed to send approval log: {e}")
             
@@ -739,11 +739,12 @@ Time: {query.message.date.strftime('%Y-%m-%d %H:%M:%S')}
 Payment verification failed
                 """.strip()
                 
-                await context.bot.send_photo(
-                    chat_id=LOG_CHANNEL_ID,
-                    photo=user_data.get('screenshot_file_id'),
-                    caption=log_message
-                )
+                if LOG_CHANNEL_ID:
+                    await context.bot.send_photo(
+                        chat_id=LOG_CHANNEL_ID,
+                        photo=user_data.get('screenshot_file_id'),
+                        caption=log_message
+                    )
             except Exception as e:
                 logger.error(f"Failed to send rejection log: {e}")
             
@@ -1161,7 +1162,8 @@ async def handle_new_chat_members(update: Update, context: ContextTypes.DEFAULT_
                             f"Joined via invite link: {invite_link}\n"
                             f"Action: removed from channel"
                         )
-                        await context.bot.send_message(LOG_CHANNEL_ID, note)
+                        if LOG_CHANNEL_ID:
+                            await context.bot.send_message(LOG_CHANNEL_ID, note)
                     except Exception as e:
                         logger.error(f"Failed to notify log channel about blocked join: {e}")
 
