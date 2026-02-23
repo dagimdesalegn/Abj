@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import types
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
@@ -48,6 +49,51 @@ logger = logging.getLogger(__name__)
     ASK_COMMENT,
     REPLY_TO_COMMENT,
 ) = range(10)
+
+# =============================================================================
+# PYTHON 3.14+ COMPATIBILITY FIX
+# =============================================================================
+def apply_python_314_fix():
+    """Apply monkey patches for Python 3.14+ compatibility"""
+    if sys.version_info < (3, 14):
+        return
+    
+    print("🔧 Applying Python 3.14+ compatibility fixes...")
+    
+    # Patch the Updater class to avoid the read-only attribute issue
+    import telegram.ext._updater
+    
+    # Store the original __init__
+    original_init = telegram.ext._updater.Updater.__init__
+    
+    def patched_init(self, *args, **kwargs):
+        # Call original init but catch the attribute error
+        try:
+            original_init(self, *args, **kwargs)
+        except AttributeError as e:
+            if '_Updater__polling_cleanup_cb' in str(e):
+                # This is our expected error, we'll handle it
+                # First, call parent class init
+                super(telegram.ext._updater.Updater, self).__init__()
+                # Manually set required attributes
+                self.__dict__['_Updater__polling_cleanup_cb'] = None
+                self.__dict__['_Updater__polling_task'] = None
+                self.__dict__['_Updater__updater_started'] = False
+                self.__dict__['_Updater__last_update_id'] = 0
+                # Set other required attributes from the original init
+                self.bot = args[0] if args else kwargs.get('bot')
+                self.update_queue = args[1] if len(args) > 1 else kwargs.get('update_queue')
+                self.user_sig_handler = None
+            else:
+                raise e
+    
+    # Replace the __init__ method
+    telegram.ext._updater.Updater.__init__ = patched_init
+    
+    print("✅ Python 3.14+ compatibility fixes applied")
+
+# Apply the fix
+apply_python_314_fix()
 
 # =============================================================================
 # ERROR HANDLER
@@ -996,7 +1042,6 @@ async def announcement_semester(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def announcement_content(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Send announcement to selected users with channel link."""
-    user = update.effective_user
     message = update.effective_message
     semester = context.user_data.get('announcement_semester', 'all')
     
@@ -1144,12 +1189,6 @@ def main() -> None:
     print("=" * 50)
     
     try:
-        # Monkey patch for Python 3.14 compatibility
-        import telegram.ext._updater
-        if not hasattr(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb'):
-            # Add the missing attribute
-            telegram.ext._updater.Updater._Updater__polling_cleanup_cb = None
-        
         # Create application
         application = Application.builder().token(BOT_TOKEN).build()
         
@@ -1262,10 +1301,6 @@ def main() -> None:
         
     except Exception as e:
         print(f"❌ CRITICAL ERROR: {e}")
-        print("Please check:")
-        print("1. Your BOT_TOKEN is correct")
-        print("2. You're using Python 3.11 or 3.12 (Python 3.14 may have issues)")
-        print("3. All environment variables are set correctly")
         import traceback
         traceback.print_exc()
         sys.exit(1)
