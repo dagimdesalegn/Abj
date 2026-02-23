@@ -1185,6 +1185,60 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     return ConversationHandler.END
 
+
+# =============================================================================
+# BLOCK FORWARDED/INVITE LINK JOINS
+# =============================================================================
+async def handle_new_chat_members(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Detect users who join the main channel via an invite link and block them
+    unless they are approved in `context.bot_data['user_statuses']`.
+    """
+    try:
+        message = update.effective_message
+        chat = update.effective_chat
+        if not message or not chat:
+            return
+
+        # Only act on the configured main channel
+        if chat.id != MAIN_CHANNEL_ID:
+            return
+
+        # Telegram provides `invite_link` on the message when the user joined via a link
+        invite_link = getattr(message, 'invite_link', None)
+
+        if not message.new_chat_members:
+            return
+
+        for member in message.new_chat_members:
+            user_id = member.id
+
+            # If joined via invite link (shared/forwarded) and not approved -> remove
+            if invite_link:
+                user_status = context.bot_data.get('user_statuses', {}).get(user_id, 'none')
+                if user_status != 'approved':
+                    try:
+                        # Kick (ban then unban) to remove the user immediately
+                        await context.bot.ban_chat_member(chat_id=chat.id, user_id=user_id)
+                        await context.bot.unban_chat_member(chat_id=chat.id, user_id=user_id)
+                    except Exception as e:
+                        logger.error(f"Failed to remove unauthorized user {user_id}: {e}")
+
+                    # Notify log channel and admins
+                    try:
+                        note = (
+                            f"🚫 Unauthorized join blocked\n"
+                            f"User: {member.full_name} (@{member.username or 'N/A'})\n"
+                            f"User ID: {user_id}\n"
+                            f"Joined via invite link: {invite_link}\n"
+                            f"Action: removed from channel"
+                        )
+                        await context.bot.send_message(LOG_CHANNEL_ID, note)
+                    except Exception as e:
+                        logger.error(f"Failed to notify log channel about blocked join: {e}")
+
+    except Exception as e:
+        logger.error(f"Error in handle_new_chat_members: {e}")
+
 # =============================================================================
 # MAIN BOT SETUP
 # =============================================================================
@@ -1274,6 +1328,12 @@ def main() -> None:
     # 5. Command handlers
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('cancel', cancel))
+
+    # 6. Prevent users joining main channel via forwarded/shared invite links
+    # This handler requires the bot to be present in the `MAIN_CHANNEL_ID`.
+    application.add_handler(
+        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS & filters.Chat(MAIN_CHANNEL_ID), handle_new_chat_members)
+    )
 
     # Initialize bot data
     application.bot_data.setdefault('pending_reviews', {})
