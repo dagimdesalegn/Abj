@@ -18,12 +18,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- CONFIGURATION ---
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-ADMIN_IDS = [int(id.strip()) for id in os.getenv('ADMIN_IDS', '').split(',')]
-LOG_CHANNEL_ID = int(os.getenv('LOG_CHANNEL_ID'))
-MAIN_CHANNEL_ID = int(os.getenv('MAIN_CHANNEL_ID'))
-AUTO_APPROVE_LINK = os.getenv('AUTO_APPROVE_LINK')
-MANUAL_APPROVE_LINK = os.getenv('MANUAL_APPROVE_LINK')
+# Prefer `OT_TOKEN` name but keep compatibility with `BOT_TOKEN` if needed
+BOT_TOKEN = os.getenv('OT_TOKEN') or os.getenv('BOT_TOKEN')
+ADMIN_IDS = [int(id.strip()) for id in os.getenv('ADMIN_IDS', '').split(',') if id.strip()]
+LOG_CHANNEL_ID = int(os.getenv('LOG_CHANNEL_ID')) if os.getenv('LOG_CHANNEL_ID') else None
+MAIN_CHANNEL_ID = int(os.getenv('MAIN_CHANNEL_ID')) if os.getenv('MAIN_CHANNEL_ID') else None
 CONTACT_USERNAME = os.getenv('CONTACT_USERNAME')
 CONTACT_PHONE = os.getenv('CONTACT_PHONE')
 BOT_USERNAME = os.getenv('BOT_USERNAME')
@@ -93,13 +92,9 @@ Join thousands of successful students who have improved their grades with ABJ Tu
 
     # Admin panel with menu buttons
     if user.id in ADMIN_IDS:
-        admin_online = context.bot_data.get('admin_online', True)
-        status_text = "🟢 Online" if admin_online else "🔴 Offline"
-        
         admin_menu = [
             ["Send Announcement", "View Statistics"],
-            ["Clear Pending", "View Questions"],
-            [f"Status: {status_text}"]
+            ["Clear Pending", "View Questions"]
         ]
         reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
         
@@ -220,8 +215,6 @@ async def handle_menu_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         elif text == "View Questions":
             await view_pending_questions(update, context)
         
-        elif text.startswith("Status:"):
-            await toggle_admin_status(update, context)
 
 async def ask_question_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Start asking a question via menu button."""
@@ -275,24 +268,13 @@ We're here to help you succeed!
 # =============================================================================
 async def toggle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Toggle admin online/offline status via menu button."""
-    current_status = context.bot_data.get('admin_online', True)
-    new_status = not current_status
-    context.bot_data['admin_online'] = new_status
-    
-    status_text = "🟢 Online" if new_status else "🔴 Offline"
+    # Admin online/offline toggle removed. Use explicit approvals only.
     admin_menu = [
         ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"],
-        [f"Status: {status_text}"]
+        ["Clear Pending", "View Questions"]
     ]
     reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
-    
-    status_message = "🟢 Admin status set to ONLINE\n\nAll new payments will be sent for manual approval." if new_status else "🔴 Admin status set to OFFLINE\n\nNew payments will receive request-to-join links."
-    
-    await update.message.reply_text(
-        status_message,
-        reply_markup=reply_markup
-    )
+    await update.message.reply_text("Admin status toggle removed. Use approvals.", reply_markup=reply_markup)
 
 async def announcement_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Start announcement via menu button."""
@@ -347,13 +329,9 @@ Semester Distribution:
     for semester, count in semester_counts.items():
         stats_text += f"• {semester}: {count}\n"
     
-    admin_online = context.bot_data.get('admin_online', True)
-    status_text = "🟢 Online" if admin_online else "🔴 Offline"
-    
     admin_menu = [
         ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"],
-        [f"Status: {status_text}"]
+        ["Clear Pending", "View Questions"]
     ]
     reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
     await update.message.reply_text(stats_text, reply_markup=reply_markup)
@@ -363,13 +341,9 @@ async def clear_pending_requests(update: Update, context: ContextTypes.DEFAULT_T
     pending_count = len(context.bot_data.get('pending_reviews', {}))
     context.bot_data['pending_reviews'] = {}
     
-    admin_online = context.bot_data.get('admin_online', True)
-    status_text = "🟢 Online" if admin_online else "🔴 Offline"
-    
     admin_menu = [
         ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"],
-        [f"Status: {status_text}"]
+        ["Clear Pending", "View Questions"]
     ]
     reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
     await update.message.reply_text(f"Cleared {pending_count} pending payment requests.", reply_markup=reply_markup)
@@ -379,13 +353,9 @@ async def view_pending_questions(update: Update, context: ContextTypes.DEFAULT_T
     pending_comments = context.bot_data.get('pending_comments', {})
     
     if not pending_comments:
-        admin_online = context.bot_data.get('admin_online', True)
-        status_text = "🟢 Online" if admin_online else "🔴 Offline"
-        
         admin_menu = [
             ["Send Announcement", "View Statistics"],
-            ["Clear Pending", "View Questions"],
-            [f"Status: {status_text}"]
+            ["Clear Pending", "View Questions"]
         ]
         reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
         await update.message.reply_text("No pending questions.", reply_markup=reply_markup)
@@ -615,9 +585,6 @@ async def receive_screenshot(update: Update, context: ContextTypes.DEFAULT_TYPE)
     }
     context.bot_data.setdefault('pending_reviews', {})[user.id] = pending_info
 
-    # Check if admin is online
-    admin_online = context.bot_data.get('admin_online', True)
-    
     # Create admin notification
     admin_caption = f"""
 NEW PAYMENT REQUEST
@@ -636,62 +603,32 @@ Time: {message.date.strftime('%Y-%m-%d %H:%M:%S')}
 Admin Status: {'Online' if admin_online else 'Offline'}
     """.strip()
     
-    if admin_online:
-        # Send to admins with approval buttons
-        keyboard = [[
-            InlineKeyboardButton("✅ APPROVE", callback_data=f"approve_{user.id}"),
-            InlineKeyboardButton("❌ REJECT", callback_data=f"reject_{user.id}")
-        ]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_photo(
-                    chat_id=admin_id,
-                    photo=message.photo[-1].file_id,
-                    caption=admin_caption,
-                    reply_markup=reply_markup
-                )
-            except Exception as e:
-                logger.error(f"Failed to send to admin {admin_id}: {e}")
-        
-        await message.reply_text(
-            f"Thank you for your submission!\n\n"
-            f"Payment ID: {payment_id}\n\n"
-            "Your registration is under review\n"
-            "We'll notify you once approved (usually within 24 hours)\n\n"
-            "Thank you for choosing ABJ Tutorial!",
-            reply_markup=ReplyKeyboardRemove()
-        )
-    else:
-        # Send to admins without approval buttons (just notification)
-        for admin_id in ADMIN_IDS:
-            try:
-                await context.bot.send_photo(
-                    chat_id=admin_id,
-                    photo=message.photo[-1].file_id,
-                    caption=admin_caption + "\n\n⚠️ Admin is offline - User received request-to-join link"
-                )
-            except Exception as e:
-                logger.error(f"Failed to send to admin {admin_id}: {e}")
-        
-        # Admin offline - send request-to-join link and show menu
-        keyboard = [[InlineKeyboardButton("Request to Join Channel", url=MANUAL_APPROVE_LINK)]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await message.reply_text(
-            f"Thank you for your payment!\n\n"
-            f"Payment ID: {payment_id}\n\n"
-            "Our admin is currently offline. Please click the button below to request access to our main channel.\n"
-            "The admin will approve your request when they come online.\n\n"
-            "Make sure your Telegram name matches your registered name for verification.",
-            reply_markup=reply_markup
-        )
-        
-        # Automatically show menu buttons to user without extra text
-        user_menu = [["Ask Question", "Help & Support"]]
-        menu_markup = ReplyKeyboardMarkup(user_menu, resize_keyboard=True)
-        await message.reply_text("Choose an option below:", reply_markup=menu_markup)
+    # Send to admins with approval buttons (approvals are required)
+    keyboard = [[
+        InlineKeyboardButton("✅ APPROVE", callback_data=f"approve_{user.id}"),
+        InlineKeyboardButton("❌ REJECT", callback_data=f"reject_{user.id}")
+    ]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_photo(
+                chat_id=admin_id,
+                photo=message.photo[-1].file_id,
+                caption=admin_caption,
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logger.error(f"Failed to send to admin {admin_id}: {e}")
+
+    await message.reply_text(
+        f"Thank you for your submission!\n\n"
+        f"Payment ID: {payment_id}\n\n"
+        "Your registration is under review\n"
+        "We'll notify you once approved (usually within 24 hours)\n\n"
+        "Thank you for choosing ABJ Tutorial!",
+        reply_markup=ReplyKeyboardRemove()
+    )
     
     context.user_data.clear()
     return ConversationHandler.END
@@ -757,22 +694,22 @@ Welcome to ABJ Tutorial!
             except Exception as e:
                 logger.error(f"Failed to send approval log: {e}")
             
-            # Notify user with auto-approve link
+            # Generate a one-time invite link (usable once) and send to the user
             try:
-                keyboard = [[InlineKeyboardButton("Join Main Channel", url=AUTO_APPROVE_LINK)]]
+                invite = await context.bot.create_chat_invite_link(chat_id=MAIN_CHANNEL_ID, member_limit=1)
+                keyboard = [[InlineKeyboardButton("Join Main Channel", url=invite.invite_link)]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
-                
+
                 await context.bot.send_message(
                     user_id,
                     "PAYMENT APPROVED! WELCOME TO ABJ TUTORIAL!\n\n"
                     "Your payment has been verified!\n"
                     "You now have full access to our learning materials\n\n"
-                    "Click below to join our main channel:",
+                    "Click below to join our main channel (one-time link):",
                     reply_markup=reply_markup
                 )
-                
             except Exception as e:
-                logger.error(f"Could not notify user {user_id}: {e}")
+                logger.error(f"Could not notify user {user_id} with invite link: {e}")
             
             # Delete the admin approval message
             await query.delete_message()
@@ -1109,25 +1046,17 @@ async def announcement_content(update: Update, context: ContextTypes.DEFAULT_TYP
     for user_id in target_users:
         try:
             if message.text:
-                keyboard = [[InlineKeyboardButton("Join Main Channel", url=AUTO_APPROVE_LINK)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
                 await context.bot.send_message(
                     user_id,
                     f"Announcement from ABJ Tutorial\n\n{message.text}\n\n"
-                    "Join our main channel for more updates:",
-                    reply_markup=reply_markup
+                    "Visit our resources for more updates."
                 )
             elif message.photo:
-                keyboard = [[InlineKeyboardButton("Join Main Channel", url=AUTO_APPROVE_LINK)]]
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                
                 await context.bot.send_photo(
                     user_id,
                     photo=message.photo[-1].file_id,
                     caption=f"Announcement from ABJ Tutorial\n\n{message.caption or ''}\n\n"
-                            "Join our main channel for more updates:",
-                    reply_markup=reply_markup
+                            "Visit our resources for more updates."
                 )
             sent_count += 1
         except Exception as e:
@@ -1340,7 +1269,6 @@ def main() -> None:
     application.bot_data.setdefault('user_statuses', {})
     application.bot_data.setdefault('user_data', {})
     application.bot_data.setdefault('pending_comments', {})
-    application.bot_data.setdefault('admin_online', True)  # Default to online
 
     print("🤖 ABJ Tutorial Bot is running with NO MINI-APP...")
     print("✅ Get Started button starts registration directly in Telegram")
