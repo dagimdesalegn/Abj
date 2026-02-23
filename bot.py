@@ -2,6 +2,7 @@ import logging
 import os
 import re
 import json
+import sys
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
@@ -14,12 +15,21 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
+# Check Python version compatibility
+if sys.version_info >= (3, 14):
+    print("⚠️  Warning: You're using Python 3.14 or higher. This version may have compatibility issues.")
+    print("✅ The bot will attempt to run, but if you encounter errors, please use Python 3.11 or 3.12")
+    print("=" * 50)
+
 # Load environment variables
 load_dotenv()
 
 # --- CONFIGURATION ---
 # Prefer `OT_TOKEN` name but keep compatibility with `BOT_TOKEN` if needed
 BOT_TOKEN = os.getenv('OT_TOKEN') or os.getenv('BOT_TOKEN')
+if not BOT_TOKEN:
+    raise ValueError("No BOT_TOKEN found in environment variables!")
+
 ADMIN_IDS = [int(id.strip()) for id in os.getenv('ADMIN_IDS', '').split(',') if id.strip()]
 LOG_CHANNEL_ID = int(os.getenv('LOG_CHANNEL_ID')) if os.getenv('LOG_CHANNEL_ID') else None
 MAIN_CHANNEL_ID = int(os.getenv('MAIN_CHANNEL_ID')) if os.getenv('MAIN_CHANNEL_ID') else None
@@ -60,7 +70,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         error_msg = f"Bot error: {context.error}\nUpdate: {update}"
         for admin_id in ADMIN_IDS:
             try:
-                await context.bot.send_message(admin_id, error_msg)
+                await context.bot.send_message(admin_id, error_msg[:4000])  # Truncate if too long
             except Exception as e:
                 logger.error(f"Failed to notify admin {admin_id} about error: {e}")
 
@@ -266,16 +276,6 @@ We're here to help you succeed!
 # =============================================================================
 # ADMIN MENU HANDLERS
 # =============================================================================
-async def toggle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Toggle admin online/offline status via menu button."""
-    # Admin online/offline toggle removed. Use explicit approvals only.
-    admin_menu = [
-        ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"]
-    ]
-    reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
-    await update.message.reply_text("Admin status toggle removed. Use approvals.", reply_markup=reply_markup)
-
 async def announcement_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Start announcement via menu button."""
     keyboard = [
@@ -792,13 +792,9 @@ async def cancel_announcement_callback(update: Update, context: ContextTypes.DEF
     query = update.callback_query
     await query.answer()
     
-    admin_online = context.bot_data.get('admin_online', True)
-    status_text = "🟢 Online" if admin_online else "🔴 Offline"
-    
     admin_menu = [
         ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"],
-        [f"Status: {status_text}"]
+        ["Clear Pending", "View Questions"]
     ]
     reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
     
@@ -926,13 +922,9 @@ async def send_reply_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_name = context.user_data.get('reply_user_name')
     
     if not comment_id or not user_id:
-        admin_online = context.bot_data.get('admin_online', True)
-        status_text = "🟢 Online" if admin_online else "🔴 Offline"
-        
         admin_menu = [
             ["Send Announcement", "View Statistics"],
-            ["Clear Pending", "View Questions"],
-            [f"Status: {status_text}"]
+            ["Clear Pending", "View Questions"]
         ]
         reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
         await update.message.reply_text("Reply session expired. Please try again.", reply_markup=reply_markup)
@@ -951,25 +943,17 @@ async def send_reply_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE)
                  f"{reply_text}\n\n"
                  f"Thank you for your question!"
         )
-        admin_online = context.bot_data.get('admin_online', True)
-        status_text = "🟢 Online" if admin_online else "🔴 Offline"
-        
         admin_menu = [
             ["Send Announcement", "View Statistics"],
-            ["Clear Pending", "View Questions"],
-            [f"Status: {status_text}"]
+            ["Clear Pending", "View Questions"]
         ]
         reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
         await update.message.reply_text("Reply sent successfully!", reply_markup=reply_markup)
             
     except Exception as e:
-        admin_online = context.bot_data.get('admin_online', True)
-        status_text = "🟢 Online" if admin_online else "🔴 Offline"
-        
         admin_menu = [
             ["Send Announcement", "View Statistics"],
-            ["Clear Pending", "View Questions"],
-            [f"Status: {status_text}"]
+            ["Clear Pending", "View Questions"]
         ]
         reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
         await update.message.reply_text("Failed to send reply. User may have blocked the bot.", reply_markup=reply_markup)
@@ -982,13 +966,9 @@ async def cancel_reply_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
-    admin_online = context.bot_data.get('admin_online', True)
-    status_text = "🟢 Online" if admin_online else "🔴 Offline"
-    
     admin_menu = [
         ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"],
-        [f"Status: {status_text}"]
+        ["Clear Pending", "View Questions"]
     ]
     reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
     
@@ -1063,13 +1043,9 @@ async def announcement_content(update: Update, context: ContextTypes.DEFAULT_TYP
         except Exception as e:
             failed_count += 1
     
-    admin_online = context.bot_data.get('admin_online', True)
-    status_text = "🟢 Online" if admin_online else "🔴 Offline"
-    
     admin_menu = [
         ["Send Announcement", "View Statistics"],
-        ["Clear Pending", "View Questions"],
-        [f"Status: {status_text}"]
+        ["Clear Pending", "View Questions"]
     ]
     reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
     
@@ -1095,13 +1071,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_status = context.bot_data.setdefault('user_statuses', {}).get(user.id, 'none')
     
     if user.id in ADMIN_IDS:
-        admin_online = context.bot_data.get('admin_online', True)
-        status_text = "🟢 Online" if admin_online else "🔴 Offline"
-        
         admin_menu = [
             ["Send Announcement", "View Statistics"],
-            ["Clear Pending", "View Questions"],
-            [f"Status: {status_text}"]
+            ["Clear Pending", "View Questions"]
         ]
         reply_markup = ReplyKeyboardMarkup(admin_menu, resize_keyboard=True)
         await update.message.reply_text("Operation cancelled.", reply_markup=reply_markup)
@@ -1175,110 +1147,130 @@ async def handle_new_chat_members(update: Update, context: ContextTypes.DEFAULT_
 # =============================================================================
 def main() -> None:
     """Start the bot."""
-    application = Application.builder().token(BOT_TOKEN).build()
-
-    # Main registration conversation handler
-    registration_conv_handler = ConversationHandler(
-        entry_points=[
-            CallbackQueryHandler(handle_get_started_callback, pattern='^get_started$'),
-            CommandHandler('start', start)
-        ],
-        states={
-            GET_FULL_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_full_name)],
-            GET_SEMESTER: [CallbackQueryHandler(get_semester, pattern='^semester_')],
-            GET_STREAM: [CallbackQueryHandler(get_stream, pattern='^stream_')],
-            GET_GENDER: [CallbackQueryHandler(get_gender, pattern='^gender_')],
-            GET_PAYMENT_METHOD: [CallbackQueryHandler(get_payment_method, pattern='^method_')],
-            AWAITING_SCREENSHOT: [MessageHandler(filters.PHOTO, receive_screenshot)],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            CallbackQueryHandler(cancel_registration_callback, pattern='^cancel_registration$')
-        ],
-    )
-
-    # Ask comment conversation handler
-    ask_comment_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Text("Ask Question"), ask_question_start)],
-        states={
-            ASK_COMMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_comment)],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            CallbackQueryHandler(cancel_question_callback, pattern='^cancel_question$')
-        ],
-    )
-
-    # Reply to comment conversation handler
-    reply_comment_conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(reply_to_comment_start, pattern='^reply_')],
-        states={
-            REPLY_TO_COMMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_reply_to_user)],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            CallbackQueryHandler(cancel_reply_callback, pattern='^cancel_reply$')
-        ],
-    )
-
-    # Announcement conversation handler
-    announcement_conv_handler = ConversationHandler(
-        entry_points=[MessageHandler(filters.Text("Send Announcement"), announcement_start)],
-        states={
-            ANNOUNCEMENT_SEMESTER: [CallbackQueryHandler(announcement_semester, pattern='^announce_')],
-            ANNOUNCEMENT_CONTENT: [MessageHandler(filters.ALL, announcement_content)],
-        },
-        fallbacks=[
-            CommandHandler('cancel', cancel),
-            CallbackQueryHandler(cancel_announcement_callback, pattern='^cancel_announcement$')
-        ],
-    )
-
-    # =========================================================================
-    # HANDLER ORDER
-    # =========================================================================
+    print("=" * 50)
+    print("🤖 ABJ Tutorial Bot is starting...")
+    print(f"📊 Python version: {sys.version}")
+    print("=" * 50)
     
-    # 1. Admin approval handler
-    application.add_handler(CallbackQueryHandler(user_approval_handler, pattern='^(approve|reject)_'))
-    
-    # 2. Cancel handlers
-    application.add_handler(CallbackQueryHandler(cancel_registration_callback, pattern='^cancel_registration$'))
-    application.add_handler(CallbackQueryHandler(cancel_announcement_callback, pattern='^cancel_announcement$'))
-    application.add_handler(CallbackQueryHandler(cancel_question_callback, pattern='^cancel_question$'))
-    application.add_handler(CallbackQueryHandler(cancel_reply_callback, pattern='^cancel_reply$'))
-    
-    # 3. Conversation handlers
-    application.add_handler(registration_conv_handler)
-    application.add_handler(ask_comment_conv_handler)
-    application.add_handler(reply_comment_conv_handler)
-    application.add_handler(announcement_conv_handler)
-    
-    # 4. Menu button handler
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_buttons))
-    
-    # 5. Command handlers
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('cancel', cancel))
+    try:
+        # Create application
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # Initialize bot data
+        application.bot_data.setdefault('pending_reviews', {})
+        application.bot_data.setdefault('user_statuses', {})
+        application.bot_data.setdefault('user_data', {})
+        application.bot_data.setdefault('pending_comments', {})
 
-    # 6. Prevent users joining main channel via forwarded/shared invite links
-    # This handler requires the bot to be present in the `MAIN_CHANNEL_ID`.
-    application.add_handler(
-        MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS & filters.Chat(MAIN_CHANNEL_ID), handle_new_chat_members)
-    )
+        # Main registration conversation handler
+        registration_conv_handler = ConversationHandler(
+            entry_points=[
+                CallbackQueryHandler(handle_get_started_callback, pattern='^get_started$'),
+                CommandHandler('start', start)
+            ],
+            states={
+                GET_FULL_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_full_name)],
+                GET_SEMESTER: [CallbackQueryHandler(get_semester, pattern='^semester_')],
+                GET_STREAM: [CallbackQueryHandler(get_stream, pattern='^stream_')],
+                GET_GENDER: [CallbackQueryHandler(get_gender, pattern='^gender_')],
+                GET_PAYMENT_METHOD: [CallbackQueryHandler(get_payment_method, pattern='^method_')],
+                AWAITING_SCREENSHOT: [MessageHandler(filters.PHOTO, receive_screenshot)],
+            },
+            fallbacks=[
+                CommandHandler('cancel', cancel),
+                CallbackQueryHandler(cancel_registration_callback, pattern='^cancel_registration$')
+            ],
+        )
 
-    # Initialize bot data
-    application.bot_data.setdefault('pending_reviews', {})
-    application.bot_data.setdefault('user_statuses', {})
-    application.bot_data.setdefault('user_data', {})
-    application.bot_data.setdefault('pending_comments', {})
+        # Ask comment conversation handler
+        ask_comment_conv_handler = ConversationHandler(
+            entry_points=[MessageHandler(filters.Text("Ask Question"), ask_question_start)],
+            states={
+                ASK_COMMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_comment)],
+            },
+            fallbacks=[
+                CommandHandler('cancel', cancel),
+                CallbackQueryHandler(cancel_question_callback, pattern='^cancel_question$')
+            ],
+        )
 
-    print("🤖 ABJ Tutorial Bot is running with NO MINI-APP...")
-    print("✅ Get Started button starts registration directly in Telegram")
-    print("✅ All features work within Telegram only")
-    print("✅ Clean and simple interface")
-    print("🚀 Bot is FINAL and PERFECT!")
-    
-    application.run_polling()
+        # Reply to comment conversation handler
+        reply_comment_conv_handler = ConversationHandler(
+            entry_points=[CallbackQueryHandler(reply_to_comment_start, pattern='^reply_')],
+            states={
+                REPLY_TO_COMMENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, send_reply_to_user)],
+            },
+            fallbacks=[
+                CommandHandler('cancel', cancel),
+                CallbackQueryHandler(cancel_reply_callback, pattern='^cancel_reply$')
+            ],
+        )
+
+        # Announcement conversation handler
+        announcement_conv_handler = ConversationHandler(
+            entry_points=[MessageHandler(filters.Text("Send Announcement"), announcement_start)],
+            states={
+                ANNOUNCEMENT_SEMESTER: [CallbackQueryHandler(announcement_semester, pattern='^announce_')],
+                ANNOUNCEMENT_CONTENT: [MessageHandler(filters.ALL, announcement_content)],
+            },
+            fallbacks=[
+                CommandHandler('cancel', cancel),
+                CallbackQueryHandler(cancel_announcement_callback, pattern='^cancel_announcement$')
+            ],
+        )
+
+        # =========================================================================
+        # HANDLER ORDER
+        # =========================================================================
+        
+        # 1. Admin approval handler
+        application.add_handler(CallbackQueryHandler(user_approval_handler, pattern='^(approve|reject)_'))
+        
+        # 2. Cancel handlers
+        application.add_handler(CallbackQueryHandler(cancel_registration_callback, pattern='^cancel_registration$'))
+        application.add_handler(CallbackQueryHandler(cancel_announcement_callback, pattern='^cancel_announcement$'))
+        application.add_handler(CallbackQueryHandler(cancel_question_callback, pattern='^cancel_question$'))
+        application.add_handler(CallbackQueryHandler(cancel_reply_callback, pattern='^cancel_reply$'))
+        
+        # 3. Conversation handlers
+        application.add_handler(registration_conv_handler)
+        application.add_handler(ask_comment_conv_handler)
+        application.add_handler(reply_comment_conv_handler)
+        application.add_handler(announcement_conv_handler)
+        
+        # 4. Menu button handler
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu_buttons))
+        
+        # 5. Command handlers
+        application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('cancel', cancel))
+
+        # 6. Prevent users joining main channel via forwarded/shared invite links
+        # This handler requires the bot to be present in the `MAIN_CHANNEL_ID`.
+        if MAIN_CHANNEL_ID:
+            application.add_handler(
+                MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS & filters.Chat(MAIN_CHANNEL_ID), handle_new_chat_members)
+            )
+
+        # Add error handler
+        application.add_error_handler(error_handler)
+
+        print("✅ Bot configuration complete!")
+        print("🚀 Bot is running with NO MINI-APP...")
+        print("✅ Get Started button starts registration directly in Telegram")
+        print("✅ All features work within Telegram only")
+        print("=" * 50)
+        
+        # Start the bot
+        application.run_polling()
+        
+    except Exception as e:
+        print(f"❌ CRITICAL ERROR: {e}")
+        print("Please check:")
+        print("1. Your BOT_TOKEN is correct")
+        print("2. You're using Python 3.11 or 3.12 (Python 3.14 may have issues)")
+        print("3. All environment variables are set correctly")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
