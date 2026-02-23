@@ -1,7 +1,5 @@
 import logging
 import os
-import re
-import json
 import sys
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
@@ -15,17 +13,10 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
-# Check Python version compatibility
-if sys.version_info >= (3, 14):
-    print("⚠️  Warning: You're using Python 3.14 or higher. This version may have compatibility issues.")
-    print("✅ The bot will attempt to run, but if you encounter errors, please use Python 3.11 or 3.12")
-    print("=" * 50)
-
 # Load environment variables
 load_dotenv()
 
 # --- CONFIGURATION ---
-# Prefer `OT_TOKEN` name but keep compatibility with `BOT_TOKEN` if needed
 BOT_TOKEN = os.getenv('OT_TOKEN') or os.getenv('BOT_TOKEN')
 if not BOT_TOKEN:
     raise ValueError("No BOT_TOKEN found in environment variables!")
@@ -70,7 +61,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         error_msg = f"Bot error: {context.error}\nUpdate: {update}"
         for admin_id in ADMIN_IDS:
             try:
-                await context.bot.send_message(admin_id, error_msg[:4000])  # Truncate if too long
+                await context.bot.send_message(admin_id, error_msg[:4000])
             except Exception as e:
                 logger.error(f"Failed to notify admin {admin_id} about error: {e}")
 
@@ -602,7 +593,7 @@ Details:
 Time: {message.date.strftime('%Y-%m-%d %H:%M:%S')}
     """.strip()
     
-    # Send to admins with approval buttons (approvals are required)
+    # Send to admins with approval buttons
     keyboard = [[
         InlineKeyboardButton("✅ APPROVE", callback_data=f"approve_{user.id}"),
         InlineKeyboardButton("❌ REJECT", callback_data=f"reject_{user.id}")
@@ -1153,6 +1144,12 @@ def main() -> None:
     print("=" * 50)
     
     try:
+        # Monkey patch for Python 3.14 compatibility
+        import telegram.ext._updater
+        if not hasattr(telegram.ext._updater.Updater, '_Updater__polling_cleanup_cb'):
+            # Add the missing attribute
+            telegram.ext._updater.Updater._Updater__polling_cleanup_cb = None
+        
         # Create application
         application = Application.builder().token(BOT_TOKEN).build()
         
@@ -1246,7 +1243,6 @@ def main() -> None:
         application.add_handler(CommandHandler('cancel', cancel))
 
         # 6. Prevent users joining main channel via forwarded/shared invite links
-        # This handler requires the bot to be present in the `MAIN_CHANNEL_ID`.
         if MAIN_CHANNEL_ID:
             application.add_handler(
                 MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS & filters.Chat(MAIN_CHANNEL_ID), handle_new_chat_members)
@@ -1270,6 +1266,8 @@ def main() -> None:
         print("1. Your BOT_TOKEN is correct")
         print("2. You're using Python 3.11 or 3.12 (Python 3.14 may have issues)")
         print("3. All environment variables are set correctly")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == "__main__":
