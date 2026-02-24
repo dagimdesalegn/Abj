@@ -14,13 +14,6 @@ from telegram.ext import (
 )
 from dotenv import load_dotenv
 
-# Python 3.14 compatibility: Set event loop policy
-if sys.version_info >= (3, 10):
-    try:
-        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
-    except Exception:
-        pass
-
 # Load environment variables
 load_dotenv()
 
@@ -1075,6 +1068,16 @@ def main() -> None:
         print("🚀 Bot is running with NO MINI-APP...")
         print("✅ All features work within Telegram only")
         print("=" * 50)
+
+        # Python 3.14 compatibility: Create event loop explicitly
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
         application.run_polling(
             allowed_updates=Update.ALL_TYPES,
