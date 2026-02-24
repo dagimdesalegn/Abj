@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import (
     Application,
@@ -12,6 +13,13 @@ from telegram.ext import (
     ConversationHandler,
 )
 from dotenv import load_dotenv
+
+# Python 3.14 compatibility: Set event loop policy
+if sys.version_info >= (3, 10):
+    try:
+        asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
+    except Exception:
+        pass
 
 # Load environment variables
 load_dotenv()
@@ -1068,7 +1076,10 @@ def main() -> None:
         print("✅ All features work within Telegram only")
         print("=" * 50)
 
-        application.run_polling()
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
 
     except Exception as e:
         print(f"❌ CRITICAL ERROR: {e}")
