@@ -1,1 +1,22 @@
+services:
+  - type: worker
+    name: abj-tutorial-bot
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_IDS
+        sync: false
+      - key: MAIN_CHANNEL_ID
+        sync: false
+      - key: CONTACT_USERNAME
+        sync: false
+      - key: CONTACT_PHONE
+        sync: false
+      - key: BOT_USERNAME
+        sync: false
 
