@@ -4,9 +4,11 @@ services:
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install --no-cache-dir -r requirements.txt
+    buildCommand: pip install --upgrade --force-reinstall --no-cache-dir python-telegram-bot==21.0 python-dotenv==1.0.0
     startCommand: python bot.py
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: BOT_TOKEN
         sync: false
       - key: ADMIN_IDS
